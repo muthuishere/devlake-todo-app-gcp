@@ -13,6 +13,8 @@ pipeline {
         // Define cache paths
         GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
         DOCKER_BUILDKIT = '1' // Enable BuildKit for better Docker build performance
+            // Add Cloud SDK version
+        CLOUDSDK_VERSION = '446.0.0' // Use the latest stable version
     }
 
     options {
@@ -23,6 +25,27 @@ pipeline {
     }
 
     stages {
+           stage('Install Cloud SDK') {
+            steps {
+                sh """
+                    # Download and install Google Cloud SDK
+                    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${CLOUDSDK_VERSION}-linux-x86_64.tar.gz
+                    tar -xf google-cloud-cli-${CLOUDSDK_VERSION}-linux-x86_64.tar.gz
+                    ./google-cloud-sdk/install.sh --quiet
+
+                    # Add to PATH
+                    export PATH="\$PATH:${WORKSPACE}/google-cloud-sdk/bin"
+
+                    # Verify installation
+                    gcloud version
+                """
+
+                // Make gcloud available to subsequent stages
+                script {
+                    env.PATH = "${WORKSPACE}/google-cloud-sdk/bin:${env.PATH}"
+                }
+            }
+        }
         stage('Checkout') {
             steps {
                 checkout scm
@@ -113,15 +136,21 @@ pipeline {
 
     post {
         always {
-            // Clean up
-            sh 'gcloud auth revoke --all'
+  script {
+                try {
+                    sh 'gcloud auth revoke --all || true'
+                } catch (Exception e) {
+                    echo "Warning: Failed to revoke GCloud authentication: ${e.message}"
+                }
+            }
 
             // Clean workspace while preserving cache
-            cleanWs(patterns: [
+ cleanWs(patterns: [
                 [pattern: '**/build/**', type: 'INCLUDE'],
                 [pattern: '**/target/**', type: 'INCLUDE'],
                 [pattern: '.gradle/**', type: 'EXCLUDE'],
-                [pattern: '.docker/**', type: 'EXCLUDE']
+                [pattern: '.docker/**', type: 'EXCLUDE'],
+                [pattern: 'google-cloud-sdk/**', type: 'INCLUDE'] // Clean up SDK installation
             ])
         }
     }
