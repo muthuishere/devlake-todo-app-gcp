@@ -3,6 +3,7 @@ pipeline {
     tools {
         jdk 'JDK21'
         nodejs 'nodejs23'
+          'google-cloud-sdk' 'gcpsdk'  // 'gcpsdk' is the name you configured in Jenkins
     }
     environment {
         PROJECT_ID = 'devlakedemo'
@@ -13,8 +14,7 @@ pipeline {
         // Define cache paths
         GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
         DOCKER_BUILDKIT = '1' // Enable BuildKit for better Docker build performance
-            // Add Cloud SDK version
-        CLOUDSDK_VERSION = '446.0.0' // Use the latest stable version
+
     }
 
     options {
@@ -25,25 +25,13 @@ pipeline {
     }
 
     stages {
-           stage('Install Cloud SDK') {
+        stage('Setup Google Cloud SDK') {
             steps {
-                sh """
-                    # Download and install Google Cloud SDK
-                    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${CLOUDSDK_VERSION}-linux-x86_64.tar.gz
-                    tar -xf google-cloud-cli-${CLOUDSDK_VERSION}-linux-x86_64.tar.gz
-                    ./google-cloud-sdk/install.sh --quiet
-
-                    # Add to PATH
-                    export PATH="\$PATH:${WORKSPACE}/google-cloud-sdk/bin"
-
-                    # Verify installation
-                    gcloud version
-                """
-
-                // Make gcloud available to subsequent stages
-                script {
-                    env.PATH = "${WORKSPACE}/google-cloud-sdk/bin:${env.PATH}"
-                }
+                // Initialize Google Cloud SDK
+                googleCloudSdkInit(
+                    credentialsId: env.CREDENTIALS_ID,
+                    projectId: env.PROJECT_ID
+                )
             }
         }
         stage('Checkout') {
@@ -89,60 +77,46 @@ pipeline {
         stage('Build and Push Docker Image') {
             steps {
                 script {
-                    withCredentials([file(credentialsId: env.CREDENTIALS_ID, variable: 'GC_KEY')]) {
-                        sh "gcloud auth activate-service-account --key-file=${GC_KEY}"
-                        sh "gcloud auth configure-docker"
+                    def imageTag = "v${BUILD_NUMBER}"
 
-                        def imageTag = "v${BUILD_NUMBER}"
+                    // Configure Docker with GCP credentials
+                    sh "gcloud auth configure-docker"
 
-                        // Use multi-stage builds and BuildKit cache
-                        sh """
-                            DOCKER_BUILDKIT=1 docker build \
-                                --cache-from ${DOCKER_IMAGE}:latest \
-                                --build-arg BUILDKIT_INLINE_CACHE=1 \
-                                -t ${DOCKER_IMAGE}:${imageTag} \
-                                -t ${DOCKER_IMAGE}:latest \
-                                .
-                        """
+                    // Build and push Docker image
+                    sh """
+                        DOCKER_BUILDKIT=1 docker build \
+                            --cache-from ${DOCKER_IMAGE}:latest \
+                            --build-arg BUILDKIT_INLINE_CACHE=1 \
+                            -t ${DOCKER_IMAGE}:${imageTag} \
+                            -t ${DOCKER_IMAGE}:latest \
+                            .
+                    """
 
-                        // Push both tags
-                        sh """
-                            docker push ${DOCKER_IMAGE}:${imageTag}
-                            docker push ${DOCKER_IMAGE}:latest
-                        """
-                    }
+                    sh """
+                        docker push ${DOCKER_IMAGE}:${imageTag}
+                        docker push ${DOCKER_IMAGE}:latest
+                    """
                 }
             }
         }
 
         stage('Deploy to Cloud Run') {
             steps {
-                script {
-                    withCredentials([file(credentialsId: env.CREDENTIALS_ID, variable: 'GC_KEY')]) {
-                        sh """
-                            gcloud auth activate-service-account --key-file=${GC_KEY}
-                            gcloud run deploy ${APP_NAME} \
-                                --image ${DOCKER_IMAGE}:latest \
-                                --platform managed \
-                                --region ${REGION} \
-                                --project ${PROJECT_ID} \
-                                --allow-unauthenticated
-                        """
-                    }
-                }
+                sh """
+                    gcloud run deploy ${APP_NAME} \
+                        --image ${DOCKER_IMAGE}:latest \
+                        --platform managed \
+                        --region ${REGION} \
+                        --project ${PROJECT_ID} \
+                        --allow-unauthenticated
+                """
             }
         }
     }
 
     post {
         always {
-  script {
-                try {
-                    sh 'gcloud auth revoke --all || true'
-                } catch (Exception e) {
-                    echo "Warning: Failed to revoke GCloud authentication: ${e.message}"
-                }
-            }
+
 
             // Clean workspace while preserving cache
  cleanWs(patterns: [
@@ -150,7 +124,7 @@ pipeline {
                 [pattern: '**/target/**', type: 'INCLUDE'],
                 [pattern: '.gradle/**', type: 'EXCLUDE'],
                 [pattern: '.docker/**', type: 'EXCLUDE'],
-                [pattern: 'google-cloud-sdk/**', type: 'INCLUDE'] // Clean up SDK installation
+
             ])
         }
     }
