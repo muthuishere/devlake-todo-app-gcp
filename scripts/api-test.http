@@ -1,0 +1,33 @@
+### devlake-todo-app-gcp/api-test.http
+
+### Variables
+@contentType = application/json
+
+### Get all todos
+GET {{baseUrl}}
+
+### Get todo by ID
+GET {{baseUrl}}/1
+
+### Create new todo
+POST {{baseUrl}}
+Content-Type: {{contentType}}
+
+{
+  "title": "Learn Spring Boot",
+  "description": "Study Spring Boot fundamentals",
+  "completed": false
+}
+
+### Update todo
+PUT {{baseUrl}}/1
+Content-Type: {{contentType}}
+
+{
+  "title": "Learn Spring Boot",
+  "description": "Study Spring Boot fundamentals - Updated",
+  "completed": true
+}
+
+### Delete todo
+DELETE {{baseUrl}}/1
