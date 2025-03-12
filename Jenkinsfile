@@ -10,7 +10,7 @@ pipeline {
         APP_NAME = 'todo-app-gcp'
         REGION = 'us-central1'
         DOCKER_IMAGE = "gcr.io/${PROJECT_ID}/${APP_NAME}"
-        CREDENTIALS_ID = 'gcp-credentials'
+        CREDENTIALS_ID = 'app-gcp-credentials'
         // Define cache paths
         GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
         DOCKER_BUILDKIT = '1' // Enable BuildKit for better Docker build performance
