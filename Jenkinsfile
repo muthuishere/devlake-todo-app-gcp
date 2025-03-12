@@ -2,7 +2,7 @@ pipeline {
     agent any
     tools {
         jdk 'JDK21'
-        nodejs 'NodeJS20'
+        nodejs 'nodejs23'
     }
     environment {
         PROJECT_ID = 'devlakedemo'
