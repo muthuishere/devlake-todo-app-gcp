@@ -3,8 +3,9 @@ pipeline {
     tools {
         jdk 'JDK21'
         nodejs 'nodejs23'
- gcloud 'gcpsdk'  // Changed from 'google-cloud-sdk' to 'gcloud'
-    }
+
+
+ }
     environment {
         PROJECT_ID = 'devlakedemo'
         APP_NAME = 'todo-app-gcp'
