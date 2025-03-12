@@ -3,7 +3,7 @@ pipeline {
     tools {
         jdk 'JDK21'
         nodejs 'nodejs23'
-          'google-cloud-sdk' 'gcpsdk'  // 'gcpsdk' is the name you configured in Jenkins
+ gcloud 'gcpsdk'  // Changed from 'google-cloud-sdk' to 'gcloud'
     }
     environment {
         PROJECT_ID = 'devlakedemo'
