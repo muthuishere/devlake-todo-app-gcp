@@ -25,15 +25,31 @@ pipeline {
     }
 
     stages {
-       stage('Setup Google Cloud SDK') {
+        stage('Setup Google Cloud SDK') {
             steps {
-                // Authenticate with Google Cloud
+                // Add debugging
+                sh 'which gcloud'
+                sh 'echo $PATH'
+
                 withCredentials([file(credentialsId: env.CREDENTIALS_ID, variable: 'GC_KEY')]) {
-                    sh '''
-                        gcloud auth activate-service-account --key-file=$GC_KEY
-                        gcloud config set project ${PROJECT_ID}
-                        gcloud auth configure-docker
-                    '''
+                    // Break down the commands and add error checking
+                    sh """
+                        set -xe
+                        # Verify the key file exists
+                        ls -l \$GC_KEY
+
+                        # Activate service account
+                        gcloud auth activate-service-account --key-file=\$GC_KEY || exit 1
+
+                        # Configure project
+                        gcloud config set project ${PROJECT_ID} || exit 1
+
+                        # Configure Docker
+                        gcloud auth configure-docker || exit 1
+
+                        # Verify configuration
+                        gcloud config list
+                    """
                 }
             }
         }
@@ -123,10 +139,10 @@ pipeline {
 
             // Clean workspace while preserving cache
  cleanWs(patterns: [
-                [pattern: '**/build/**', type: 'INCLUDE'],
+          [pattern: '**/build/**', type: 'INCLUDE'],
                 [pattern: '**/target/**', type: 'INCLUDE'],
                 [pattern: '.gradle/**', type: 'EXCLUDE'],
-                [pattern: '.docker/**', type: 'EXCLUDE'],
+                [pattern: '.docker/**', type: 'EXCLUDE']
 
             ])
         }
