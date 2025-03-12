@@ -25,13 +25,16 @@ pipeline {
     }
 
     stages {
-        stage('Setup Google Cloud SDK') {
+       stage('Setup Google Cloud SDK') {
             steps {
-                // Initialize Google Cloud SDK
-                googleCloudSdkInit(
-                    credentialsId: env.CREDENTIALS_ID,
-                    projectId: env.PROJECT_ID
-                )
+                // Authenticate with Google Cloud
+                withCredentials([file(credentialsId: env.CREDENTIALS_ID, variable: 'GC_KEY')]) {
+                    sh '''
+                        gcloud auth activate-service-account --key-file=$GC_KEY
+                        gcloud config set project ${PROJECT_ID}
+                        gcloud auth configure-docker
+                    '''
+                }
             }
         }
         stage('Checkout') {
